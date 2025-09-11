@@ -1,0 +1,348 @@
+{
+  "buckets": {
+    "conviction": [
+      "NFLX",
+      "TSM"
+    ],
+    "swing": [
+      "NVDA",
+      "MSFT",
+      "MELI",
+      "NU",
+      "ACLS",
+      "TCEHY",
+      "NTES",
+      "AMD",
+      "SMCI",
+      "1211.HK",
+      "EXAS",
+      "APP",
+      "COHR",
+      "XIACY"
+    ],
+    "premium": [
+      "ASML",
+      "LLY",
+      "ISRG"
+    ],
+    "avoid": [
+      "DIS",
+      "PATH",
+      "NVO"
+    ],
+    "moonshot": [
+      "INVA",
+      "AEVA",
+      "AVAV",
+      "AUTL"
+    ],
+    "watchlist": [
+      "AVGO",
+      "VRT",
+      "MU",
+      "JPMC"
+    ]
+  },
+  "tickers": {
+    "NVDA": {
+      "symbol": "NVDA",
+      "name": null,
+      "exchange": null,
+      "currency": null,
+      "isin": null,
+      "wkn": null,
+      "type": "equity",
+      "active": true
+    },
+    "ASML": {
+      "symbol": "ASML",
+      "name": null,
+      "exchange": null,
+      "currency": null,
+      "isin": null,
+      "wkn": null,
+      "type": "equity",
+      "active": true
+    },
+    "LLY": {
+      "symbol": "LLY",
+      "name": null,
+      "exchange": null,
+      "currency": null,
+      "isin": null,
+      "wkn": null,
+      "type": "equity",
+      "active": true
+    },
+    "DIS": {
+      "symbol": "DIS",
+      "name": null,
+      "exchange": null,
+      "currency": null,
+      "isin": null,
+      "wkn": null,
+      "type": "equity",
+      "active": true
+    },
+    "PATH": {
+      "symbol": "PATH",
+      "name": null,
+      "exchange": null,
+      "currency": null,
+      "isin": null,
+      "wkn": null,
+      "type": "equity",
+      "active": true
+    },
+    "MSFT": {
+      "symbol": "MSFT",
+      "name": null,
+      "exchange": null,
+      "currency": null,
+      "isin": null,
+      "wkn": null,
+      "type": "equity",
+      "active": true
+    },
+    "MELI": {
+      "symbol": "MELI",
+      "name": null,
+      "exchange": null,
+      "currency": null,
+      "isin": null,
+      "wkn": null,
+      "type": "equity",
+      "active": true
+    },
+    "NU": {
+      "symbol": "NU",
+      "name": null,
+      "exchange": null,
+      "currency": null,
+      "isin": null,
+      "wkn": null,
+      "type": "equity",
+      "active": true
+    },
+    "MU": {
+      "symbol": "MU",
+      "name": null,
+      "exchange": null,
+      "currency": null,
+      "isin": null,
+      "wkn": null,
+      "type": "equity",
+      "active": true
+    },
+    "ACLS": {
+      "symbol": "ACLS",
+      "name": null,
+      "exchange": null,
+      "currency": null,
+      "isin": null,
+      "wkn": null,
+      "type": "equity",
+      "active": true
+    },
+    "TCEHY": {
+      "symbol": "TCEHY",
+      "name": null,
+      "exchange": null,
+      "currency": null,
+      "isin": null,
+      "wkn": null,
+      "type": "equity",
+      "active": true
+    },
+    "NTES": {
+      "symbol": "NTES",
+      "name": null,
+      "exchange": null,
+      "currency": null,
+      "isin": null,
+      "wkn": null,
+      "type": "equity",
+      "active": true
+    },
+    "AMD": {
+      "symbol": "AMD",
+      "name": null,
+      "exchange": null,
+      "currency": null,
+      "isin": null,
+      "wkn": null,
+      "type": "equity",
+      "active": true
+    },
+    "SMCI": {
+      "symbol": "SMCI",
+      "name": null,
+      "exchange": null,
+      "currency": null,
+      "isin": null,
+      "wkn": null,
+      "type": "equity",
+      "active": true
+    },
+    "TSM": {
+      "symbol": "TSM",
+      "name": null,
+      "exchange": null,
+      "currency": null,
+      "isin": null,
+      "wkn": null,
+      "type": "equity",
+      "active": true
+    },
+    "1211.HK": {
+      "symbol": "1211.HK",
+      "name": null,
+      "exchange": null,
+      "currency": null,
+      "isin": null,
+      "wkn": null,
+      "type": "etf",
+      "active": true
+    },
+    "EXAS": {
+      "symbol": "EXAS",
+      "name": null,
+      "exchange": null,
+      "currency": null,
+      "isin": null,
+      "wkn": null,
+      "type": "equity",
+      "active": true
+    },
+    "ISRG": {
+      "symbol": "ISRG",
+      "name": null,
+      "exchange": null,
+      "currency": null,
+      "isin": null,
+      "wkn": null,
+      "type": "equity",
+      "active": true
+    },
+    "NVO": {
+      "symbol": "NVO",
+      "name": null,
+      "exchange": null,
+      "currency": null,
+      "isin": null,
+      "wkn": null,
+      "type": "equity",
+      "active": true
+    },
+    "NFLX": {
+      "symbol": "NFLX",
+      "name": null,
+      "exchange": null,
+      "currency": null,
+      "isin": null,
+      "wkn": null,
+      "type": "equity",
+      "active": true
+    },
+    "APP": {
+      "symbol": "APP",
+      "name": null,
+      "exchange": null,
+      "currency": null,
+      "isin": null,
+      "wkn": null,
+      "type": "equity",
+      "active": true
+    },
+    "INVA": {
+      "symbol": "INVA",
+      "name": null,
+      "exchange": null,
+      "currency": null,
+      "isin": null,
+      "wkn": null,
+      "type": "equity",
+      "active": true
+    },
+    "AEVA": {
+      "symbol": "AEVA",
+      "name": null,
+      "exchange": null,
+      "currency": null,
+      "isin": null,
+      "wkn": null,
+      "type": "equity",
+      "active": true
+    },
+    "AVAV": {
+      "symbol": "AVAV",
+      "name": null,
+      "exchange": null,
+      "currency": null,
+      "isin": null,
+      "wkn": null,
+      "type": "equity",
+      "active": true
+    },
+    "AUTL": {
+      "symbol": "AUTL",
+      "name": null,
+      "exchange": null,
+      "currency": null,
+      "isin": null,
+      "wkn": null,
+      "type": "equity",
+      "active": true
+    },
+    "COHR": {
+      "symbol": "COHR",
+      "name": null,
+      "exchange": null,
+      "currency": null,
+      "isin": null,
+      "wkn": null,
+      "type": "equity",
+      "active": true
+    },
+    "AVGO": {
+      "symbol": "AVGO",
+      "name": null,
+      "exchange": null,
+      "currency": null,
+      "isin": null,
+      "wkn": null,
+      "type": "equity",
+      "active": true
+    },
+    "VRT": {
+      "symbol": "VRT",
+      "name": null,
+      "exchange": null,
+      "currency": null,
+      "isin": null,
+      "wkn": null,
+      "type": "equity",
+      "active": true
+    },
+    "XIACY": {
+      "symbol": "XIACY",
+      "name": null,
+      "exchange": null,
+      "currency": null,
+      "isin": null,
+      "wkn": null,
+      "type": "equity",
+      "active": true
+    },
+    "JPMC": {
+      "symbol": "JPMC",
+      "name": null,
+      "exchange": null,
+      "currency": null,
+      "isin": null,
+      "wkn": null,
+      "type": "equity",
+      "active": true
+    }
+  }
+}

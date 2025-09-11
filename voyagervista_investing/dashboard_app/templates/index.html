@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ticker Dashboard</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 0 1rem;
+        background-color: #f5f5f5;
+      }
+      h1 {
+        text-align: center;
+      }
+      .container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+      }
+      .section {
+        background: #ffffff;
+        border-radius: 4px;
+        padding: 1rem;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        flex: 1 1 300px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      th, td {
+        border-bottom: 1px solid #ddd;
+        padding: 0.4rem;
+        text-align: left;
+        font-size: 0.9rem;
+      }
+      th {
+        background-color: #f0f0f0;
+      }
+      select, input[type="text"], button {
+        margin-right: 0.5rem;
+        padding: 0.4rem;
+        font-size: 0.9rem;
+      }
+      .bucket-label {
+        font-weight: bold;
+        text-transform: capitalize;
+        margin-top: 0.5rem;
+      }
+      .signal-true {
+        color: green;
+        font-weight: bold;
+      }
+      .signal-false {
+        color: red;
+        font-weight: bold;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Ticker Monitoring Dashboard</h1>
+    <div class="container">
+      <!-- Add ticker section -->
+      <div class="section">
+        <h2>Add Ticker</h2>
+        <form id="addTickerForm">
+          <input id="tickerInput" type="text" placeholder="Symbol (e.g. NVDA)" />
+          <select id="bucketSelect">
+            <option value="">Default (swing)</option>
+            <!-- Bucket options will be injected by JS -->
+          </select>
+          <button type="submit">Add</button>
+        </form>
+        <p id="addTickerStatus"></p>
+      </div>
+      <!-- Bucket management -->
+      <div class="section">
+        <h2>Manage Buckets</h2>
+        <div style="display:flex; gap:1rem; flex-wrap:wrap; align-items:flex-end;">
+          <div style="flex:1; min-width:200px;">
+            <h3 style="margin:0 0 0.5rem 0; font-size:1rem;">Create Bucket</h3>
+            <input id="newBucketName" type="text" placeholder="Bucket name" />
+            <button id="createBucketBtn" type="button">Create</button>
+          </div>
+          <div style="flex:1; min-width:200px;">
+            <h3 style="margin:0 0 0.5rem 0; font-size:1rem;">Rename Bucket</h3>
+            <input id="oldBucketName" type="text" placeholder="Old name" />
+            <input id="newBucketName2" type="text" placeholder="New name" />
+            <button id="renameBucketBtn" type="button">Rename</button>
+          </div>
+          <div style="flex:1; min-width:200px;">
+            <h3 style="margin:0 0 0.5rem 0; font-size:1rem;">Delete Bucket</h3>
+            <input id="delBucketName" type="text" placeholder="Bucket name" />
+            <button id="deleteBucketBtn" type="button">Delete</button>
+          </div>
+        </div>
+      </div>
+      <!-- Buckets section -->
+      <div class="section" id="bucketsSection">
+        <h2>Tickers by Bucket</h2>
+        <div id="bucketsContainer"></div>
+      </div>
+      <!-- Signals section -->
+      <div class="section">
+        <h2>Signals</h2>
+        <button id="refreshSignals">Refresh Signals</button>
+        <p>Risk-On: <span id="riskOn">—</span></p>
+        <table id="signalsTable">
+          <thead>
+            <tr>
+              <th data-key="symbol">Symbol</th>
+              <th data-key="bucket">Bucket</th>
+              <th data-key="close">Close</th>
+              <th data-key="sma50">SMA50</th>
+              <th data-key="sma200">SMA200</th>
+              <th data-key="above50">&gt;50D</th>
+              <th data-key="above200">&gt;200D</th>
+              <th data-key="entry_ok">Entry?</th>
+              <th data-key="avg_target">Avg Target</th>
+              <th data-key="buy_pct">Buy%</th>
+              <th data-key="hold_pct">Hold%</th>
+              <th data-key="sell_pct">Sell%</th>
+              <th data-key="analyst_total">#Analysts</th>
+              <th data-key="dist_to_target_pct">Dist%</th>
+			  <th data-key="next_earnings">Nxt Earnings</th>
+            </tr>
+          </thead>
+          <tbody id="signalsBody"></tbody>
+        </table>
+        <div style="margin-top:.75rem; display:flex; gap:.5rem">
+          <button id="refreshSignals">Refresh Signals</button>
+          <button id="saveLayoutBtn" title="Persist buckets & tickers to disk">Save Layout</button>
+        </div>
+      </div>
+    </div>
+    <script src="/static/app.js"></script>
+  </body>
+</html>
