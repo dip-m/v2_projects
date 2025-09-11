@@ -13,6 +13,7 @@ If you require intraday data or other intervals, adjust the
 from __future__ import annotations
 
 from typing import Optional
+import time, logging
 import pandas as pd
 
 try:
@@ -24,6 +25,18 @@ except ImportError as e:
 
 
 class YahooPriceProvider:
+    def _retry(self, fn, attempts=3, delay=1.0):
+        last_err = None
+        for i in range(attempts):
+            try:
+                return fn()
+            except Exception as e:
+                last_err = e
+                logging.warning(f"Yahoo retry {i+1}/{attempts} failed: {e}")
+                time.sleep(delay)
+        if last_err:
+            logging.error(f"Yahoo fetch failed after {attempts} attempts: {last_err}")
+        return None
     """Fetches price data from Yahoo Finance."""
 
     def latest_price(self, symbol: str) -> Optional[float]:

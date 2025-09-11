@@ -14,8 +14,10 @@ from typing import Dict, List, Optional, Any
 from pathlib import Path
 import os
 import json
+import yfinance as yf
 from datetime import datetime
 from datetime import date as _date
+import logging
 
 # Optional import for Yahoo earnings fallback. If yfinance is unavailable, the fallback will be disabled.
 try:
