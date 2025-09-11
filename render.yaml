@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: voyagervista-dashboard
+    env: docker
+    plan: starter
+    autoDeploy: true
+    healthCheckPath: /
+    dockerfilePath: Dockerfile
+    envVars:
+      - key: PYTHONUNBUFFERED
+        value: "1"
+    disk:
+      name: vv-data
+      mountPath: /app/dashboard_app/data
+      sizeGB: 1
+      readOnly: false
