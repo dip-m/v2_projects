@@ -1,14 +1,18 @@
 services:
   - type: web
     name: voyagervista-dashboard
-    env: docker
+    runtime: docker
+    dockerfilePath: Dockerfile
+    dockerContext: .
     plan: starter
     autoDeploy: true
     healthCheckPath: /
-    dockerfilePath: Dockerfile
     envVars:
       - key: PYTHONUNBUFFERED
         value: "1"
+      # Optional: slow down Yahoo calls slightly to avoid 429s
+      - key: YF_MIN_INTERVAL
+        value: "1.5"
     disk:
       name: vv-data
       mountPath: /app/dashboard_app/data
