@@ -12,9 +12,15 @@ If you require intraday data or other intervals, adjust the
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Optional, Tuple
+import time, logging, os, json, math, random
+from pathlib import Path
+from datetime import datetime, timedelta
+import pandas as pd
+import yfinance as yf
 import time, logging
 import pandas as pd
+import yfinance as yf
 
 try:
     import yfinance as yf  # type: ignore
@@ -25,6 +31,79 @@ except ImportError as e:
 
 
 class YahooPriceProvider:
+    # Disk cache inside the app data dir (persistent on Render)
+    CACHE_DIR = Path(__file__).resolve().parents[1] / "data" / "cache"
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    # Throttle: min seconds between Yahoo calls
+    MIN_INTERVAL = float(os.getenv("YF_MIN_INTERVAL", "1.2"))
+    _last_call_ts = 0.0
+
+    def _throttle(self):
+        now = time.time()
+        wait = self.MIN_INTERVAL - (now - self._last_call_ts)
+        if wait > 0:
+            time.sleep(wait)
+        self._last_call_ts = time.time()
+
+    def _retry(self, fn, attempts=3, base_delay=1.0):
+        last = None
+        for i in range(attempts):
+            try:
+                self._throttle()
+                return fn()
+            except Exception as e:
+                last = e
+                # Exponential backoff with jitter
+                delay = base_delay * (2 ** i) + random.uniform(0, 0.5)
+                logging.warning(f"Yahoo attempt {i+1}/{attempts} failed: {e} — backing off {delay:.1f}s")
+                time.sleep(delay)
+        if last:
+            logging.error(f"Yahoo failed after {attempts} attempts: {last}")
+        return None
+
+    def _cache_path(self, kind: str, key: str) -> Path:
+        safe = key.replace("/", "_").replace(":", "_")
+        return self.CACHE_DIR / f"{kind}__{safe}"
+
+    def _read_json_cache(self, path: Path, max_age: int) -> Optional[dict]:
+        try:
+            if not path.exists():
+                return None
+            age = time.time() - path.stat().st_mtime
+            if age > max_age:
+                return None
+            return json.loads(path.read_text())
+        except Exception:
+            return None
+
+    def _write_json_cache(self, path: Path, data: dict) -> None:
+        try:
+            path.write_text(json.dumps(data), encoding="utf-8")
+        except Exception:
+            pass
+
+    def _read_df_cache(self, path: Path, max_age: int) -> Optional[pd.DataFrame]:
+        try:
+            if not path.exists():
+                return None
+            age = time.time() - path.stat().st_mtime
+            if age > max_age:
+                return None
+            if path.suffix == ".parquet":
+                return pd.read_parquet(path)
+            return pd.read_csv(path, parse_dates=True, index_col=0)
+        except Exception:
+            return None
+
+    def _write_df_cache(self, path: Path, df: pd.DataFrame) -> None:
+        try:
+            if path.suffix == ".parquet":
+                df.to_parquet(path, index=True)
+            else:
+                df.to_csv(path)
+        except Exception:
+            pass
+
     def _retry(self, fn, attempts=3, delay=1.0):
         last_err = None
         for i in range(attempts):
