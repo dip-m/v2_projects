@@ -3,6 +3,8 @@
 // present tickers, buckets and signals. This script relies on
 // elements defined in ``templates/index.html``.
 
+function formatSymbol(row){ try { return row.name ? `${row.symbol} (${row.name})` : row.symbol; } catch(e){ return row.symbol; } }
+
 document.addEventListener("DOMContentLoaded", () => {
   loadBuckets();
   loadSignals();
@@ -159,6 +161,26 @@ async function loadBuckets() {
     // Render bucket lists
     const container = document.getElementById("bucketsContainer");
     container.innerHTML = "";
+
+    // Render buckets as bordered cards
+    Object.entries(data.buckets || {}).forEach(([name, list]) => {
+      const card = document.createElement("div");
+      card.className = "bucket-card";
+      const title = document.createElement("div");
+      title.className = "bucket-label";
+      title.textContent = name;
+      card.appendChild(title);
+      const ul = document.createElement("ul");
+      ul.style.margin = "6px 0 0 16px";
+      (list || []).forEach(sym => {
+        const li = document.createElement("li");
+        li.textContent = sym;
+        ul.appendChild(li);
+      });
+      card.appendChild(ul);
+      container.appendChild(card);
+    });
+    return; // skip any old rendering below
     for (const [bucketName, symbols] of Object.entries(buckets)) {
       const section = document.createElement("div");
       section.className = "bucket";

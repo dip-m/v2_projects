@@ -5,16 +5,35 @@ services:
     dockerfilePath: Dockerfile
     dockerContext: .
     plan: starter
-    autoDeploy: true
     healthCheckPath: /
-    envVars:
-      - key: PYTHONUNBUFFERED
-        value: "1"
-      # Optional: slow down Yahoo calls slightly to avoid 429s
-      - key: YF_MIN_INTERVAL
-        value: "1.5"
     disk:
       name: vv-data
       mountPath: /app/dashboard_app/data
       sizeGB: 1
       readOnly: false
+    envVars:
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - key: YF_MIN_INTERVAL
+        value: "1.5"
+
+  - type: worker
+    name: voyagervista-refresher
+    runtime: docker
+    dockerfilePath: Dockerfile
+    dockerContext: .
+    plan: starter
+    disk:
+      name: vv-data
+      mountPath: /app/dashboard_app/data
+      sizeGB: 1
+      readOnly: false
+    envVars:
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - key: REFRESH_SEC
+        value: "600"
+      - key: SLEEP_BETWEEN
+        value: "1.6"
+    startCommand: >
+      sh -c "python -m dashboard_app.worker"

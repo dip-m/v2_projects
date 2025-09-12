@@ -14,10 +14,8 @@ from typing import Dict, List, Optional, Any
 from pathlib import Path
 import os
 import json
-import yfinance as yf
 from datetime import datetime
 from datetime import date as _date
-import logging
 
 # Optional import for Yahoo earnings fallback. If yfinance is unavailable, the fallback will be disabled.
 try:
@@ -129,33 +127,6 @@ class SignalRow:
 
 
 class DataStore:
-    _target_cache_dir = Path(__file__).resolve().parent / "data" / "cache"
-    _target_cache_dir.mkdir(parents=True, exist_ok=True)
-
-    def _target_cache_path(self, sym: str) -> Path:
-        return self._target_cache_dir / f"target__{sym}.json"
-
-    def _get_cached_target(self, sym: str, max_age_sec: int = 86400) -> Optional[float]:
-        try:
-            p = self._target_cache_path(sym)
-            if not p.exists():
-                return None
-            age = time.time() - p.stat().st_mtime
-            if age > max_age_sec:
-                return None
-            data = _json.loads(p.read_text())
-            val = data.get("avg_target")
-            return float(val) if val is not None else None
-        except Exception:
-            return None
-
-    def _set_cached_target(self, sym: str, val: float) -> None:
-        try:
-            p = self._target_cache_path(sym)
-            p.write_text(_json.dumps({"avg_target": float(val)}), encoding="utf-8")
-        except Exception:
-            pass
-
     """A simple, in-memory data store.
 
     This store maintains a set of tickers and their bucket assignments.
@@ -427,34 +398,18 @@ class DataStore:
                     "entry_ok": row.entry_ok,
                 }
                 if include_analyst:
-                    # --- Merge analyst data ---
-                    analyst_data = self._analyst_maybe(sym) or {}
+                    # Merge analyst data
+                    analyst_data = self._analyst_maybe(sym)
                     d.update(analyst_data)
-
-                    # --- Avg target (cache -> Yahoo fallback) ---
-                    if d.get("avg_target") in (None, "", 0):
-                        cached = self._get_cached_target(sym)
-                        if cached is not None:
-                            d["avg_target"] = cached
-                        else:
-                            try:
-                                ti = yf.Ticker(sym)
-                                info = getattr(ti, "get_info", None)
-                                meta = info() if callable(info) else getattr(ti, "info", {}) or {}
-                                mean_t = meta.get("targetMeanPrice") or meta.get("targetMedianPrice")
-                                if mean_t:
-                                    d["avg_target"] = float(mean_t)
-                                    self._set_cached_target(sym, float(mean_t))
-                            except Exception:
-                                pass
-
-                    # --- Next earnings (provider -> Yahoo fallback, future only) ---
+                    # Next earnings date
                     try:
                         ne = self._analyst.next_earnings(sym)
                     except Exception:
                         ne = None
+                    # If provider returns None, use Yahoo fallback (best effort)
                     if ne is None:
                         ne = _yahoo_next_earnings_fallback(sym)
+                    # If still past for any reason, null it out so the UI doesn’t show stale dates.
                     if ne:
                         try:
                             if ne < _date.today().isoformat():
@@ -462,48 +417,8 @@ class DataStore:
                         except Exception:
                             pass
                     d["next_earnings"] = ne
-
-                    # --- Normalize recommendations for UI ---
-                    buy_pct = d.get("buy_pct")
-                    hold_pct = d.get("hold_pct")
-                    sell_pct = d.get("sell_pct")
-
-                    perc = d.get("perc") or {}     # e.g. {"buy": 65, "hold": 25, "sell": 10}
-                    counts = d.get("counts") or {} # e.g. {"strongBuy":2,"buy":8,"hold":4,"sell":1,"strongSell":0}
-
-                    # Prefer perc if present
-                    if buy_pct is None and hold_pct is None and sell_pct is None and perc:
-                        try:
-                            buy_pct  = float(perc["buy"])  if perc.get("buy")  is not None else None
-                            hold_pct = float(perc["hold"]) if perc.get("hold") is not None else None
-                            sell_pct = float(perc["sell"]) if perc.get("sell") is not None else None
-                        except Exception:
-                            buy_pct = hold_pct = sell_pct = None
-
-                    # Else derive from counts
-                    if (buy_pct is None or hold_pct is None or sell_pct is None) and counts:
-                        try:
-                            sb = int(counts.get("strongBuy", 0) or 0)
-                            b  = int(counts.get("buy", 0) or 0)
-                            h  = int(counts.get("hold", 0) or 0)
-                            s  = int(counts.get("sell", 0) or 0)
-                            ss = int(counts.get("strongSell", 0) or 0)
-                            total = sb + b + h + s + ss
-                            if total > 0:
-                                buy_pct  = 100.0 * (sb + b) / total
-                                hold_pct = 100.0 * h / total
-                                sell_pct = 100.0 * (s + ss) / total
-                            # Provide analyst_total if missing
-                            d.setdefault("analyst_total", total)
-                        except Exception:
-                            pass
-
-                    d["buy_pct"] = None if buy_pct is None else round(buy_pct, 2)
-                    d["hold_pct"] = None if hold_pct is None else round(hold_pct, 2)
-                    d["sell_pct"] = None if sell_pct is None else round(sell_pct, 2)
-
-                    # --- Distance to target ---
-                    dist_pct = None
+                    # Compute distance to target percentage if both price and target are available
+                    dist_pct: Optional[float] = None
                     try:
                         if d.get("avg_target") is not None and d.get("close") is not None:
                             at = float(d["avg_target"])
@@ -511,9 +426,8 @@ class DataStore:
                             if cp != 0:
                                 dist_pct = round((at / cp - 1.0) * 100.0, 2)
                     except Exception:
-                        pass
+                        dist_pct = None
                     d["dist_to_target_pct"] = dist_pct
-                    
                 out.append(d)
         return out
 

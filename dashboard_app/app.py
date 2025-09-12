@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Optional, Dict, Any
+import json
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
@@ -109,9 +110,14 @@ def move_ticker(body: MoveBody) -> Dict[str, Any]:
 
 @app.get("/signals")
 def signals(include_analyst: bool = True) -> Dict[str, Any]:
-    """Return all signal dictionaries. Query param include_analyst controls analyst data."""
+    try:
+        if CACHE_FILE.exists():
+            obj = json.loads(CACHE_FILE.read_text())
+            return obj
+    except Exception:
+        pass
     rows = STORE.signals(include_analyst=include_analyst)
-    return {"signals": rows}
+    return {"signals": rows, "as_of": None}
 
 @app.post("/save")
 def save_state() -> Dict[str, Any]:
