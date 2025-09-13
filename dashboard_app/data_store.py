@@ -124,6 +124,21 @@ class SignalRow:
     above50: bool
     above200: bool
     entry_ok: bool
+    # Added indicators
+    delta_sma50_pct: Optional[float] = None
+    delta_sma200_pct: Optional[float] = None
+    rsi14: Optional[float] = None
+    rsi_zone: Optional[str] = None
+    macd: Optional[float] = None
+    macd_signal: Optional[float] = None
+    macd_hist: Optional[float] = None
+    w52_high: Optional[float] = None
+    w52_low: Optional[float] = None
+    pct_to_52w_high: Optional[float] = None
+    pct_from_52w_low: Optional[float] = None
+    pivot: Optional[float] = None
+    vol_avg20_ratio: Optional[float] = None
+    reentry: Optional[bool] = None
 
 
 class DataStore:
@@ -246,22 +261,124 @@ class DataStore:
             return None
         return float(series.tail(window).mean())
 
+    
+    def _ema(self, series: "pd.Series", span: int) -> Optional[float]:
+        try:
+            return float(series.ewm(span=span, adjust=False).mean().iloc[-1])
+        except Exception:
+            return None
+
+    def _rsi(self, series: "pd.Series", period: int = 14) -> Optional[float]:
+        try:
+            delta = series.diff()
+            gains = delta.clip(lower=0).rolling(window=period).mean()
+            losses = (-delta.clip(upper=0)).rolling(window=period).mean()
+            rs = gains / (losses.replace(0, 1e-9))
+            rsi = 100 - (100 / (1 + rs))
+            val = float(rsi.iloc[-1])
+            if val < 0 or val > 100:
+                return None
+            return round(val, 2)
+        except Exception:
+            return None
+
+    def _macd(self, series: "pd.Series", fast: int = 12, slow: int = 26, signal: int = 9):
+        try:
+            ema_fast = series.ewm(span=fast, adjust=False).mean()
+            ema_slow = series.ewm(span=slow, adjust=False).mean()
+            macd = ema_fast - ema_slow
+            macd_signal = macd.ewm(span=signal, adjust=False).mean()
+            macd_hist = macd - macd_signal
+            return float(macd.iloc[-1]), float(macd_signal.iloc[-1]), float(macd_hist.iloc[-1])
+        except Exception:
+            return None, None, None
+
+    def _classic_pivot(self, prev_high: float, prev_low: float, prev_close: float) -> Optional[float]:
+        try:
+            return round((prev_high + prev_low + prev_close) / 3.0, 2)
+        except Exception:
+            return None
+    
     def _hist(self, symbol: str) -> Optional[pd.DataFrame]:
         return self._price.recent_ohlc(symbol, period="12mo", interval="1d")
 
+    
     def _calc_signal(self, symbol: str, bucket: str) -> SignalRow:
         df = self._hist(symbol)
         if df is None or df.empty:
-            return SignalRow(symbol=symbol, bucket=bucket, close=None, sma50=None, sma200=None, above50=False, above200=False, entry_ok=False)
+            return SignalRow(
+                symbol=symbol, bucket=bucket,
+                close=None, sma50=None, sma200=None,
+                above50=False, above200=False, entry_ok=False
+            )
+        # Ensure standardized column names
+        try:
+            df = df.rename(columns=str.capitalize)
+        except Exception:
+            pass
         close = float(df["Close"].iloc[-1])
+        # Moving averages
         sma50 = self._sma(df["Close"], 50)
         sma200 = self._sma(df["Close"], 200)
-        above50 = close > sma50 if sma50 is not None else False
-        above200 = close > sma200 if sma200 is not None else False
+        above50 = close > (sma50 if sma50 is not None else -1e18)
+        above200 = close > (sma200 if sma200 is not None else -1e18)
         entry_ok = bool(above50 and above200 and self.risk_on())
-        return SignalRow(symbol=symbol, bucket=bucket, close=close, sma50=sma50, sma200=sma200, above50=above50, above200=above200, entry_ok=entry_ok)
-
-    # ----- State persistence -----
+        # Deltas to SMAs
+        delta_sma50_pct = round(((close / sma50) - 1) * 100, 2) if sma50 is not None else None
+        delta_sma200_pct = round(((close / sma200) - 1) * 100, 2) if sma200 is not None else None
+        # RSI
+        rsi14 = self._rsi(df["Close"], 14)
+        rsi_zone = ('Overbought' if (rsi14 is not None and rsi14 >= 70) else
+                    ('Oversold' if (rsi14 is not None and rsi14 <= 30) else
+                     ('Neutral' if rsi14 is not None else None)))
+        # MACD
+        macd, macd_signal, macd_hist = self._macd(df["Close"])
+        # 52-week window (approx 252 trading days)
+        window = min(len(df), 252)
+        w52_high = float(df['High'].tail(window).max()) if window > 0 else None
+        w52_low = float(df['Low'].tail(window).min()) if window > 0 else None
+        pct_to_52w_high = round(((w52_high / close) - 1) * 100, 2) if (w52_high is not None and close is not None) else None
+        pct_from_52w_low = round(((close / w52_low) - 1) * 100, 2) if (w52_low is not None and close is not None) else None
+        # Classic pivot from previous day
+        if len(df) >= 2:
+            prev = df.iloc[-2]
+            pivot = self._classic_pivot(float(prev["High"]), float(prev["Low"]), float(prev["Close"]))
+        else:
+            pivot = None
+        # Volume ratio
+        try:
+            vol_avg20 = float(df["Volume"].rolling(window=20).mean().iloc[-1])
+            vol_last = float(df["Volume"].iloc[-1])
+            vol_avg20_ratio = round((vol_last / vol_avg20), 2) if (vol_avg20 and vol_avg20 != 0) else None
+        except Exception:
+            vol_avg20_ratio = None
+        # Re-entry: crossed above SMA50 today after being below yesterday
+        try:
+            if len(df) >= 2 and sma50 is not None:
+                y_close = float(df["Close"].iloc[-2])
+                reentry = (y_close < sma50) and (close > sma50)
+            else:
+                reentry = None
+        except Exception:
+            reentry = None
+        return SignalRow(
+            symbol=symbol, bucket=bucket,
+            close=close, sma50=sma50, sma200=sma200,
+            above50=above50, above200=above200, entry_ok=entry_ok,
+            delta_sma50_pct=delta_sma50_pct, delta_sma200_pct=delta_sma200_pct,
+            rsi14=rsi14, rsi_zone=rsi_zone,
+            macd=(round(macd, 4) if isinstance(macd, (int, float)) else macd),
+            macd_signal=(round(macd_signal, 4) if isinstance(macd_signal, (int, float)) else macd_signal),
+            macd_hist=(round(macd_hist, 4) if isinstance(macd_hist, (int, float)) else macd_hist),
+            w52_high=(round(w52_high, 2) if isinstance(w52_high, (int, float)) else w52_high),
+            w52_low=(round(w52_low, 2) if isinstance(w52_low, (int, float)) else w52_low),
+            pct_to_52w_high=pct_to_52w_high,
+            pct_from_52w_low=pct_from_52w_low,
+            pivot=(round(pivot, 2) if isinstance(pivot, (int, float)) else pivot),
+            vol_avg20_ratio=vol_avg20_ratio,
+            reentry=reentry
+        )
+# ----- State persistence -----
     def _save_state(self) -> None:
         """Persist current tickers and bucket allocations to disk."""
         try:
@@ -397,6 +514,24 @@ class DataStore:
                     "above200": row.above200,
                     "entry_ok": row.entry_ok,
                 }
+                
+                # --- Added indicator fields ---
+                d.update({
+                    "delta_sma50_pct": (round(row.delta_sma50_pct, 2) if isinstance(row.delta_sma50_pct, (int, float)) else row.delta_sma50_pct),
+                    "delta_sma200_pct": (round(row.delta_sma200_pct, 2) if isinstance(row.delta_sma200_pct, (int, float)) else row.delta_sma200_pct),
+                    "rsi14": row.rsi14,
+                    "rsi_zone": row.rsi_zone,
+                    "macd": (round(row.macd, 4) if isinstance(row.macd, (int, float)) else row.macd),
+                    "macd_signal": (round(row.macd_signal, 4) if isinstance(row.macd_signal, (int, float)) else row.macd_signal),
+                    "macd_hist": (round(row.macd_hist, 4) if isinstance(row.macd_hist, (int, float)) else row.macd_hist),
+                    "w52_high": (round(row.w52_high, 2) if isinstance(row.w52_high, (int, float)) else row.w52_high),
+                    "w52_low": (round(row.w52_low, 2) if isinstance(row.w52_low, (int, float)) else row.w52_low),
+                    "pct_to_52w_high": (round(row.pct_to_52w_high, 2) if isinstance(row.pct_to_52w_high, (int, float)) else row.pct_to_52w_high),
+                    "pct_from_52w_low": (round(row.pct_from_52w_low, 2) if isinstance(row.pct_from_52w_low, (int, float)) else row.pct_from_52w_low),
+                    "pivot": (round(row.pivot, 2) if isinstance(row.pivot, (int, float)) else row.pivot),
+                    "vol_avg20_ratio": (round(row.vol_avg20_ratio, 2) if isinstance(row.vol_avg20_ratio, (int, float)) else row.vol_avg20_ratio),
+                    "reentry": row.reentry,
+                })
                 if include_analyst:
                     # Merge analyst data
                     analyst_data = self._analyst_maybe(sym)

@@ -1,8 +1,6 @@
 {
   "buckets": {
-    "conviction": [
-      "LLY"
-    ],
+    "conviction": [],
     "swing": [
       "NVDA",
       "MSFT",
@@ -24,6 +22,7 @@
     ],
     "premium": [
       "ASML",
+      "LLY",
       "ISRG"
     ],
     "avoid": [
