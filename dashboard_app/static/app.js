@@ -33,8 +33,26 @@ function fmtDate(d) {
   return String(d);
 }
 
+// Format large numbers into human readable form (K, M, B, T)
+function fmtLarge(v) {
+  if (v === null || v === undefined || v === "") return "—";
+  const n = Number(v);
+  if (isNaN(n)) return String(v);
+  const abs = Math.abs(n);
+  if (abs >= 1e12) return (n / 1e12).toFixed(2) + "T";
+  if (abs >= 1e9) return (n / 1e9).toFixed(2) + "B";
+  if (abs >= 1e6) return (n / 1e6).toFixed(2) + "M";
+  if (abs >= 1e3) return (n / 1e3).toFixed(2) + "K";
+  return n.toFixed(2);
+}
+
 // Global to hold bucket names (used for selects)
 let DATASTORE_BUCKETS = [];
+// Sorting state: key and direction ('asc' or 'desc')
+let SORT_KEY = "symbol";
+let SORT_DIR = "asc";
+// Filter values keyed by column
+const FILTERS = {};
 
 // Formatting helper for move ticker selects
 async function moveTicker(symbol, bucket) {
@@ -120,20 +138,154 @@ async function loadBuckets() {
         container.appendChild(card);
       });
     }
+    // After rendering buckets, refresh the remove ticker dropdown
+    await populateRemoveDropdown();
   } catch (ex) {
     console.error(ex);
+  }
+}
+
+// Populate the remove ticker dropdown with all available tickers
+async function populateRemoveDropdown() {
+  const sel = document.getElementById("removeTickerSelect");
+  if (!sel) return;
+  // Reset options
+  sel.innerHTML = '<option value="">Select a ticker…</option>';
+  try {
+    const resp = await fetch("/tickers");
+    const data = await resp.json();
+    const tickers = data.tickers || [];
+    tickers.sort().forEach((sym) => {
+      const opt = document.createElement("option");
+      opt.value = sym;
+      opt.textContent = sym;
+      sel.appendChild(opt);
+    });
+  } catch (ex) {
+    console.error(ex);
+  }
+}
+
+// Handler to remove the selected ticker from the master list
+async function removeSelectedTicker() {
+  const sel = document.getElementById("removeTickerSelect");
+  const status = document.getElementById("removeTickerStatus");
+  if (!sel || !sel.value) {
+    if (status) status.textContent = "Choose a ticker";
+    return;
+  }
+  const symbol = sel.value;
+  try {
+    const resp = await fetch(`/tickers/${encodeURIComponent(symbol)}`, { method: "DELETE" });
+    if (!resp.ok) {
+      if (status) status.textContent = "Failed to remove";
+      return;
+    }
+    if (status) status.textContent = `${symbol} removed.`;
+    await populateRemoveDropdown();
+    await loadBuckets();
+    await loadSignals();
+    await loadBreadth();
+  } catch (ex) {
+    if (status) status.textContent = "Error removing ticker";
   }
 }
 
 // Fetch and render signals in a table with expandable sub-rows
 async function loadSignals() {
   try {
-    const resp = await fetch("/signals?include_analyst=true");
+    const resp = await fetch(`/signals?include_analyst=true`);
     const data = await resp.json();
-    const signals = data.signals || [];
+    let signals = data.signals || [];
     const tbody = document.getElementById("signalsBody");
     if (!tbody) return;
     tbody.innerHTML = "";
+
+    // Augment signals with derived fields (MACD decision)
+    signals = signals.map((row) => {
+      // Determine MACD decision: buy if MACD > signal, sell if <, hold otherwise
+      let decision = "";
+      try {
+        const m = row.macd;
+        const s = row.macd_signal;
+        if (typeof m === "number" && typeof s === "number") {
+          if (m > s) decision = "Buy";
+          else if (m < s) decision = "Sell";
+          else decision = "Hold";
+        } else {
+          decision = "";
+        }
+      } catch (_) {
+        decision = "";
+      }
+      row.macd_decision = decision;
+      return row;
+    });
+
+    // Apply filters
+    const matchesFilter = (row, key, filterValue) => {
+      if (!filterValue) return true;
+      const val = row[key];
+      let text = "";
+      if (val === null || val === undefined) {
+        text = "";
+      } else if (typeof val === "number") {
+        text = String(val);
+      } else if (typeof val === "boolean") {
+        text = val ? "yes" : "no";
+      } else {
+        text = String(val);
+      }
+      return text.toLowerCase().includes(filterValue);
+    };
+    signals = signals.filter((row) => {
+      for (const key in FILTERS) {
+        const f = FILTERS[key];
+        if (f && !matchesFilter(row, key, f)) return false;
+      }
+      return true;
+    });
+
+    // Sort signals
+    const compareRows = (a, b) => {
+      const key = SORT_KEY;
+      let va = a[key];
+      let vb = b[key];
+      // Normalize values for comparison
+      const nullish = (x) => x === null || x === undefined || x === "";
+      // If both nullish, equal
+      if (nullish(va) && nullish(vb)) return 0;
+      // Nullish values sort last
+      if (nullish(va)) return SORT_DIR === "asc" ? 1 : -1;
+      if (nullish(vb)) return SORT_DIR === "asc" ? -1 : 1;
+      // Numeric comparison if both numbers
+      if (typeof va === "number" && typeof vb === "number") {
+        return SORT_DIR === "asc" ? va - vb : vb - va;
+      }
+      // Boolean comparison
+      if (typeof va === "boolean" && typeof vb === "boolean") {
+        // true > false
+        if (va === vb) return 0;
+        return SORT_DIR === "asc"
+          ? va === false ? -1 : 1
+          : va === false ? 1 : -1;
+      }
+      // Convert to string and compare
+      const sa = String(va).toLowerCase();
+      const sb = String(vb).toLowerCase();
+      if (sa === sb) return 0;
+      return SORT_DIR === "asc" ? (sa < sb ? -1 : 1) : (sa > sb ? -1 : 1);
+    };
+    signals.sort(compareRows);
+
+    // Update sort indicators on header cells
+    document.querySelectorAll("#signalsTable th").forEach((th) => {
+      th.classList.remove("sorted-asc", "sorted-desc");
+    });
+    const activeTh = document.querySelector(`#signalsTable th[data-key='${SORT_KEY}']`);
+    if (activeTh) {
+      activeTh.classList.add(SORT_DIR === "asc" ? "sorted-asc" : "sorted-desc");
+    }
 
     signals.forEach((row) => {
       // Main row
@@ -208,8 +360,16 @@ async function loadSignals() {
       trMain.appendChild(tdNextEr);
       // Re-entry
       const tdReentry = document.createElement("td");
-      tdReentry.textContent = row.reentry === true || row.reentry === "yes" || row.reentry === "ok" ? "Re-entry ✓" : row.reentry === false || row.reentry === "no" ? "No" : "—";
+      tdReentry.textContent = row.reentry === true || row.reentry === "yes" || row.reentry === "ok"
+        ? "Re-entry ✓"
+        : row.reentry === false || row.reentry === "no"
+        ? "No"
+        : "—";
       trMain.appendChild(tdReentry);
+      // MACD decision
+      const tdMacdDec = document.createElement("td");
+      tdMacdDec.textContent = row.macd_decision || "—";
+      trMain.appendChild(tdMacdDec);
 
       // Details row (initially hidden)
       const trSub = document.createElement("tr");
@@ -217,7 +377,7 @@ async function loadSignals() {
       const tdBlank = document.createElement("td");
       trSub.appendChild(tdBlank);
       const tdSub = document.createElement("td");
-      tdSub.colSpan = 9;
+      tdSub.colSpan = 10;
       // Create a container for indicator blocks
       const container = document.createElement("div");
       container.style.display = "grid";
@@ -239,12 +399,15 @@ async function loadSignals() {
       maTitle.textContent = "Moving Averages";
       blockMA.appendChild(maTitle);
       const maLine1 = document.createElement("div");
-      const delta50 = row.sma50 !== null && row.sma50 !== undefined && row.close !== null && row.close !== undefined ? ((row.close - row.sma50) / row.sma50) * 100 : null;
-      maLine1.textContent = `SMA50: ${fmtNum(row.sma50)} (${fmtPct(delta50)})`;
+      // Use delta percentages if provided; else compute on the fly
+      const d50 = typeof row.delta_sma50_pct === "number" ? row.delta_sma50_pct :
+        (row.sma50 && row.close ? ((row.close - row.sma50) / row.sma50) * 100 : null);
+      maLine1.textContent = `SMA50: ${fmtNum(row.sma50)} (${fmtPct(d50)})`;
       blockMA.appendChild(maLine1);
       const maLine2 = document.createElement("div");
-      const delta200 = row.sma200 !== null && row.sma200 !== undefined && row.close !== null && row.close !== undefined ? ((row.close - row.sma200) / row.sma200) * 100 : null;
-      maLine2.textContent = `SMA200: ${fmtNum(row.sma200)} (${fmtPct(delta200)})`;
+      const d200 = typeof row.delta_sma200_pct === "number" ? row.delta_sma200_pct :
+        (row.sma200 && row.close ? ((row.close - row.sma200) / row.sma200) * 100 : null);
+      maLine2.textContent = `SMA200: ${fmtNum(row.sma200)} (${fmtPct(d200)})`;
       blockMA.appendChild(maLine2);
       const maLine3 = document.createElement("div");
       maLine3.textContent = `Above 50: ${fmtBool(row.above50)} · Above 200: ${fmtBool(row.above200)}`;
@@ -267,43 +430,29 @@ async function loadSignals() {
       blockMACD.appendChild(macdLine);
       container.appendChild(blockMACD);
 
-      // Volume block
-      const blockVol = document.createElement("div");
-      blockVol.style.border = "1px solid #e2e8f0";
-      blockVol.style.borderRadius = "0.5rem";
-      blockVol.style.padding = "0.5rem";
-      const volTitle = document.createElement("div");
-      volTitle.style.fontSize = "0.75rem";
-      volTitle.style.fontWeight = "600";
-      volTitle.style.color = "#64748b";
-      volTitle.textContent = "Volume";
-      blockVol.appendChild(volTitle);
-      const volLine1 = document.createElement("div");
-      volLine1.textContent = `Vol: ${fmtNum(row.volume)}`;
-      blockVol.appendChild(volLine1);
-      const volLine2 = document.createElement("div");
-      volLine2.textContent = `Avg20: ${fmtNum(row.avg20)}`;
-      blockVol.appendChild(volLine2);
-      container.appendChild(blockVol);
-
-      // 52-week range block
-      const blockRange = document.createElement("div");
-      blockRange.style.border = "1px solid #e2e8f0";
-      blockRange.style.borderRadius = "0.5rem";
-      blockRange.style.padding = "0.5rem";
-      const rangeTitle = document.createElement("div");
-      rangeTitle.style.fontSize = "0.75rem";
-      rangeTitle.style.fontWeight = "600";
-      rangeTitle.style.color = "#64748b";
-      rangeTitle.textContent = "52-week Range";
-      blockRange.appendChild(rangeTitle);
-      const rangeLine1 = document.createElement("div");
-      rangeLine1.textContent = `High: ${fmtNum(row.w52_high)}`;
-      blockRange.appendChild(rangeLine1);
-      const rangeLine2 = document.createElement("div");
-      rangeLine2.textContent = `Low: ${fmtNum(row.w52_low)}`;
-      blockRange.appendChild(rangeLine2);
-      container.appendChild(blockRange);
+      // Volume ratio and 52-week range block
+      const blockVolRange = document.createElement("div");
+      blockVolRange.style.border = "1px solid #e2e8f0";
+      blockVolRange.style.borderRadius = "0.5rem";
+      blockVolRange.style.padding = "0.5rem";
+      const volRangeTitle = document.createElement("div");
+      volRangeTitle.style.fontSize = "0.75rem";
+      volRangeTitle.style.fontWeight = "600";
+      volRangeTitle.style.color = "#64748b";
+      volRangeTitle.textContent = "Range & Volume";
+      blockVolRange.appendChild(volRangeTitle);
+      const vrLine1 = document.createElement("div");
+      vrLine1.textContent = `High: ${fmtNum(row.w52_high)} · Low: ${fmtNum(row.w52_low)}`;
+      blockVolRange.appendChild(vrLine1);
+      const vrLine2 = document.createElement("div");
+      const pctHigh = row.pct_to_52w_high;
+      const pctLow = row.pct_from_52w_low;
+      vrLine2.textContent = `To High: ${fmtPct(pctHigh)} · From Low: ${fmtPct(pctLow)}`;
+      blockVolRange.appendChild(vrLine2);
+      const vrLine3 = document.createElement("div");
+      vrLine3.textContent = `Vol/Avg20: ${fmtNum(row.vol_avg20_ratio)}`;
+      blockVolRange.appendChild(vrLine3);
+      container.appendChild(blockVolRange);
 
       // Analyst block
       const blockAnalyst = document.createElement("div");
@@ -339,6 +488,31 @@ async function loadSignals() {
       targetLine1.textContent = `Dist to Target: ${fmtPct(row.dist_to_target_pct)}`;
       blockTarget.appendChild(targetLine1);
       container.appendChild(blockTarget);
+
+      // Fundamentals block
+      const blockFund = document.createElement("div");
+      blockFund.style.border = "1px solid #e2e8f0";
+      blockFund.style.borderRadius = "0.5rem";
+      blockFund.style.padding = "0.5rem";
+      const fundTitle = document.createElement("div");
+      fundTitle.style.fontSize = "0.75rem";
+      fundTitle.style.fontWeight = "600";
+      fundTitle.style.color = "#64748b";
+      fundTitle.textContent = "Fundamentals";
+      blockFund.appendChild(fundTitle);
+      const fundLine1 = document.createElement("div");
+      fundLine1.textContent = `Rev Growth: ${fmtPct(row.revenue_growth_pct)}`;
+      blockFund.appendChild(fundLine1);
+      const fundLine2 = document.createElement("div");
+      fundLine2.textContent = `Profit Margin: ${fmtPct(row.profit_margin_pct)}`;
+      blockFund.appendChild(fundLine2);
+      const fundLine3 = document.createElement("div");
+      fundLine3.textContent = `Market Cap: ${fmtLarge(row.market_cap)}`;
+      blockFund.appendChild(fundLine3);
+      const fundLine4 = document.createElement("div");
+      fundLine4.textContent = `Revenue: ${fmtLarge(row.revenue)}`;
+      blockFund.appendChild(fundLine4);
+      container.appendChild(blockFund);
 
       // Extras block
       const blockExtras = document.createElement("div");
@@ -527,6 +701,41 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
   }
+
+  // Remove ticker button
+  const removeTickerBtn = document.getElementById("removeTickerBtn");
+  if (removeTickerBtn) {
+    removeTickerBtn.addEventListener("click", () => {
+      removeSelectedTicker();
+    });
+  }
+
+  // Attach sort handlers to table headers
+  document.querySelectorAll("#signalsTable th[data-key]").forEach((th) => {
+    th.style.cursor = "pointer";
+    th.addEventListener("click", () => {
+      const key = th.getAttribute("data-key");
+      if (!key) return;
+      if (SORT_KEY === key) {
+        SORT_DIR = SORT_DIR === "asc" ? "desc" : "asc";
+      } else {
+        SORT_KEY = key;
+        SORT_DIR = "asc";
+      }
+      loadSignals();
+    });
+  });
+
+  // Attach filter handlers
+  document.querySelectorAll("tr.filter-row input[data-key]").forEach((inp) => {
+    inp.addEventListener("input", (ev) => {
+      const key = inp.getAttribute("data-key");
+      if (key) {
+        FILTERS[key] = (inp.value || "").toLowerCase();
+        loadSignals();
+      }
+    });
+  });
   // Initial data load
   loadBuckets();
   loadSignals();

@@ -6,17 +6,14 @@
       "MSFT",
       "MELI",
       "NU",
-      "MU",
       "ACLS",
       "TCEHY",
-      "NTES",
       "AMD",
       "SMCI",
       "TSM",
       "1211.HK",
       "EXAS",
       "NFLX",
-      "APP",
       "COHR",
       "XIACY"
     ],
@@ -37,8 +34,10 @@
       "AUTL"
     ],
     "watchlist": [
-      "AVGO",
-      "VRT"
+      "VRT",
+      "NTES",
+      "MU",
+      "APP"
     ]
   },
   "tickers": {
@@ -294,16 +293,6 @@
     },
     "COHR": {
       "symbol": "COHR",
-      "name": null,
-      "exchange": null,
-      "currency": null,
-      "isin": null,
-      "wkn": null,
-      "type": "equity",
-      "active": true
-    },
-    "AVGO": {
-      "symbol": "AVGO",
       "name": null,
       "exchange": null,
       "currency": null,

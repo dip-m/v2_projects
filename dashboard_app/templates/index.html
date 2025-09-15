@@ -40,6 +40,16 @@
       th {
         background-color: #f0f0f0;
       }
+
+      /* Sorting indicators */
+      th.sorted-asc::after {
+        content: " \25B2"; /* upwards triangle */
+        font-size: 0.7rem;
+      }
+      th.sorted-desc::after {
+        content: " \25BC"; /* downwards triangle */
+        font-size: 0.7rem;
+      }
       select, input[type="text"], button {
         margin-right: 0.5rem;
         padding: 0.4rem;
@@ -94,6 +104,15 @@
             <input id="delBucketName" type="text" placeholder="Bucket name" />
             <button id="deleteBucketBtn" type="button">Delete</button>
           </div>
+          <!-- Remove ticker from master list -->
+          <div style="flex:1; min-width:200px;">
+            <h3 style="margin:0 0 0.5rem 0; font-size:1rem;">Delete Ticker</h3>
+            <select id="removeTickerSelect">
+              <option value="">Select a ticker…</option>
+            </select>
+            <button id="removeTickerBtn" type="button">Delete</button>
+            <p id="removeTickerStatus" style="margin-top:0.5rem; font-size:0.85rem; color:#334155"></p>
+          </div>
         </div>
       </div>
       </div>
@@ -112,15 +131,31 @@
           <thead>
             <tr>
               <th style="width:2rem">&nbsp;</th>
-              <th>Ticker</th>
-              <th>Close</th>
-              <th>Entry</th>
-              <th>RSI Zone</th>
-              <th>Pivot</th>
-              <th>Avg Target</th>
-              <th>Buy%</th>
-              <th>Next ER</th>
-              <th>Re‑entry</th>
+              <!-- Each th has a data-key attribute used for sorting -->
+              <th data-key="symbol">Ticker</th>
+              <th data-key="close">Close</th>
+              <th data-key="entry_ok">Entry</th>
+              <th data-key="rsi_zone">RSI Zone</th>
+              <th data-key="pivot">Pivot</th>
+              <th data-key="avg_target">Avg Target</th>
+              <th data-key="buy_pct">Buy%</th>
+              <th data-key="next_earnings">Next ER</th>
+              <th data-key="reentry">Re‑entry</th>
+              <th data-key="macd_decision">MACD Decision</th>
+            </tr>
+            <!-- Filter row: one input per sortable column -->
+            <tr class="filter-row">
+              <th></th>
+              <th><input data-key="symbol" placeholder="Filter" style="width:100%" /></th>
+              <th><input data-key="close" placeholder="Filter" style="width:100%" /></th>
+              <th><input data-key="entry_ok" placeholder="Filter" style="width:100%" /></th>
+              <th><input data-key="rsi_zone" placeholder="Filter" style="width:100%" /></th>
+              <th><input data-key="pivot" placeholder="Filter" style="width:100%" /></th>
+              <th><input data-key="avg_target" placeholder="Filter" style="width:100%" /></th>
+              <th><input data-key="buy_pct" placeholder="Filter" style="width:100%" /></th>
+              <th><input data-key="next_earnings" placeholder="Filter" style="width:100%" /></th>
+              <th><input data-key="reentry" placeholder="Filter" style="width:100%" /></th>
+              <th><input data-key="macd_decision" placeholder="Filter" style="width:100%" /></th>
             </tr>
           </thead>
           <tbody id="signalsBody"></tbody>

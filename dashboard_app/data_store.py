@@ -563,8 +563,79 @@ class DataStore:
                     except Exception:
                         dist_pct = None
                     d["dist_to_target_pct"] = dist_pct
+
+                # Always include fundamental metrics when available
+                try:
+                    fund = self._fundamentals(sym)
+                except Exception:
+                    fund = {
+                        "revenue_growth_pct": None,
+                        "profit_margin_pct": None,
+                        "market_cap": None,
+                        "revenue": None,
+                    }
+                d.update(fund)
                 out.append(d)
         return out
+
+    # ----- Fundamentals -----
+    def _fundamentals(self, symbol: str) -> Dict[str, Any]:
+        """
+        Return basic fundamental metrics for a symbol.
+
+        This helper attempts to load key financial metrics using the optional
+        ``yfinance`` dependency. When available it retrieves values such as
+        revenue growth, profit margin, market capitalisation and total
+        revenue from the ticker's information. Each numeric value is
+        converted into a human-friendly form (e.g. percentages are scaled
+        to 100). If ``yfinance`` is not installed or the fields are not
+        present, ``None`` values are returned. The returned dictionary
+        contains the keys:
+
+        ``revenue_growth_pct`` – Revenue growth percentage (e.g. 15.2)
+        ``profit_margin_pct`` – Profit margin percentage (e.g. 23.5)
+        ``market_cap`` – Market capitalisation (raw number)
+        ``revenue`` – Total revenue (raw number)
+        """
+        # Use the module-level _yf imported at top if available
+        if _yf is None:
+            return {
+                "revenue_growth_pct": None,
+                "profit_margin_pct": None,
+                "market_cap": None,
+                "revenue": None,
+            }
+        try:
+            t = _yf.Ticker(symbol)
+            info = {}
+            # Some versions of yfinance lazily fetch info; wrap in try
+            try:
+                info = t.get_info() or {}
+            except Exception:
+                info = getattr(t, "fast_info", {}) or {}
+            rev_growth = info.get("revenueGrowth")
+            profit_marg = info.get("profitMargins")
+            market_cap = info.get("marketCap")
+            revenue = info.get("totalRevenue") or info.get("revenue")
+            # Convert percentages
+            def to_pct(x: Any) -> Optional[float]:
+                try:
+                    return None if x is None else round(float(x) * 100.0, 2)
+                except Exception:
+                    return None
+            return {
+                "revenue_growth_pct": to_pct(rev_growth),
+                "profit_margin_pct": to_pct(profit_marg),
+                "market_cap": None if market_cap is None else float(market_cap),
+                "revenue": None if revenue is None else float(revenue),
+            }
+        except Exception:
+            return {
+                "revenue_growth_pct": None,
+                "profit_margin_pct": None,
+                "market_cap": None,
+                "revenue": None,
+            }
 
     # ----- Breadth -----
     def risk_on(self) -> bool:
